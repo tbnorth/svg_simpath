@@ -3,31 +3,79 @@ svg_simpath.py - simplify paths in SVG files
 Terry N. Brown, terrynbrown@gmail.com, Fri Dec 09 12:45:02 2016
 """
 
+import argparse
 import operator
 import os
 import re
 import sys
 from collections import namedtuple, defaultdict
 
-import sys
 from xml import sax
 from xml.sax.saxutils import XMLGenerator
-
 from xml.sax.saxutils import XMLFilterBase
-
 from xml.sax.xmlreader import AttributesImpl
 
 PATHSPLIT = re.compile(r'([MLz])')
 WHITESPACE = re.compile(r'[ \t\n]')
 
-def flint(x):
-    return int(float(x))
+def make_parser():
+    """build an argparse.ArgumentParser, don't call this directly,
+       call get_options() instead.
+    """
+    parser = argparse.ArgumentParser(
+        description="""Simplify SVG path elements""",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
 
-def coord_split(s):
-    return map(flint, s.split(','))
+    parser.add_argument("--res", default='1',
+        help="snapping resolution"
+    )
+
+    return parser
+
+
+def get_options(args=None):
+    """
+    get_options - use argparse to parse args, and return a
+    argparse.Namespace, possibly with some changes / expansions /
+    validatations.
+
+    Client code should call this method with args as per sys.argv[1:],
+    rather than calling make_parser() directly.
+
+    :param [str] args: arguments to parse
+    :return: options with modifications / validations
+    :rtype: argparse.Namespace
+    """
+    opt = make_parser().parse_args(args)
+
+    # modifications / validations go here
+
+    return opt
+
 
 class PathSimplify(XMLFilterBase):
 
+    def __init__(self, res):    
+        XMLFilterBase.__init__(self, sax.make_parser())
+        try:
+            res = int(res)
+        except ValueError:
+            res = float(res)
+        self.res = res
+        if isinstance(self.res, int):
+            self.round = self.round_int
+        else:
+            self.round = self.round_float
+
+    def round_float(self, x):
+        return int(float(x))
+    def round_int(self, x):
+        return int(float(x))
+    
+    def coord_split(self, s):
+        return map(self.round, s.split(','))
+    
     def startElement(self, name, attrs):
         if name == 'path':
             d = attrs.get('d', [])
@@ -52,9 +100,9 @@ class PathSimplify(XMLFilterBase):
                     #     [points[i:i+2] for i in range(0,len(points),10)])
                     
                     new_points = points[:2]
-                    coord = coord_split(points[1])
+                    coord = self.coord_split(points[1])
                     for idx in range(2, len(points), 2):
-                        new_coord = coord_split(points[idx+1])
+                        new_coord = self.coord_split(points[idx+1])
                         if new_coord != coord or idx+2 == len(points):
                             coord = new_coord
                             new_points.extend(points[idx:idx+2])
@@ -75,11 +123,11 @@ class PathSimplify(XMLFilterBase):
         return XMLFilterBase.startElement(self, name, AttributesImpl(attrs))
 
 def main():
-    parser = sax.make_parser()
+    opt = get_options()
     downstream_handler = XMLGenerator(sys.stdout)
-    filter_handler = PathSimplify(parser)
+    filter_handler = PathSimplify(opt.res)
     filter_handler.setContentHandler(downstream_handler)
-    filter_handler.parse(sys.argv[1])
+    filter_handler.parse(sys.stdin)
 
 if __name__ == '__main__':
     main()
