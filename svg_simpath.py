@@ -69,9 +69,9 @@ class PathSimplify(XMLFilterBase):
             self.round = self.round_float
 
     def round_float(self, x):
-        return int(float(x))
+        return int(float(x)/self.res) * self.res
     def round_int(self, x):
-        return int(float(x))
+        return int(float(x)) // self.res * self.res
     
     def coord_split(self, s):
         return map(self.round, s.split(','))
