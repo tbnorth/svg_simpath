@@ -33,39 +33,45 @@ class PathSimplify(XMLFilterBase):
             d = attrs.get('d', [])
             if not d:
                 return XMLFilterBase.startElement(self, name, attrs)
-            points = PATHSPLIT.split(WHITESPACE.sub('', d))
-            assert not points[0], points[0]
-            del points[0]
-            if not points[-1]:
-                del points[-1]
-            closed = points[-1] == 'z'
-            if closed:
-                del points[-1]
-            if len(points) > 50:
-                sys.stderr.write("%s ->" % (len(points)/2))
-                # points = reduce(operator.add, 
-                #     [points[i:i+2] for i in range(0,len(points),10)])
                 
-                new_points = points[:2]
-                coord = coord_split(points[1])
-                for idx in range(2, len(points), 2):
-                    try:
+            subpaths = d.split('z')
+            full_path = []
+            
+            for d_n, d in enumerate(subpaths):
+                if not d:
+                    continue
+                closed = d_n+1 < len(subpaths)
+                
+                points = PATHSPLIT.split(WHITESPACE.sub('', d))
+                assert not points[0], points[0]
+                del points[0]
+        
+                if len(points) > 50:
+                    sys.stderr.write("%s ->" % (len(points)/2))
+                    # points = reduce(operator.add, 
+                    #     [points[i:i+2] for i in range(0,len(points),10)])
+                    
+                    new_points = points[:2]
+                    coord = coord_split(points[1])
+                    for idx in range(2, len(points), 2):
                         new_coord = coord_split(points[idx+1])
-                    except:
-                        sys.stderr.write("%s\n" % d[:50])
-                        sys.stderr.write("%s\n" % d[-50:])
-                        sys.stderr.write("%s\n" % points[:8])
-                        sys.stderr.write("%s\n" % points[-8:])
-                        raise
-                    if new_coord != coord:
-                        coord = new_coord
-                        new_points.extend(points[idx:idx+2])
-                
-                sys.stderr.write("%s\n" % (len(new_points)/2))
+                        if new_coord != coord or idx+2 == len(points):
+                            coord = new_coord
+                            new_points.extend(points[idx:idx+2])
+                                                
+                    sys.stderr.write("%s\n" % (len(new_points)/2))
+                    
+                else:
+                    new_points = points
+                    
                 if closed:
                     new_points.append('z')
-                attrs = dict(attrs)
-                attrs['d'] = ''.join(new_points)
+                    
+                full_path.append(''.join(new_points))
+
+            attrs = dict(attrs)
+            attrs['d'] = ''.join('\n'.join(full_path))
+
         return XMLFilterBase.startElement(self, name, AttributesImpl(attrs))
 
 def main():
